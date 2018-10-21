@@ -1,3 +1,7 @@
 # jupyter saves TMP files here
 
 .ipynb_checkpoints/
+
+# w2v pre-trained model
+
+./EvaluateModels/models
