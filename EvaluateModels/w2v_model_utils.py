@@ -29,16 +29,19 @@ def online_training(model, training_corpus, epochs = 5):
     # model.save()
     
 ## TODO: update with WEIGHTED MEAN OF VECTORS
-def mean_of_vectors(vectors):
-    """given a list of vectors, return the simplest mean of vectors."""
+def mean_of_vectors(vectors, vec_size):
+    """given a list of vectors (and their size), return the simplest mean of vectors."""
+
     ## vectors might be empty if no entity is recognized
-    if vectors == []:
+    if len(vectors) < 1:
         print('Unknown doc found')
         return []
-    sum_vectors = np.zeros(np.shape(vectors[0]))
+    # all word vectors have the same shape (always the same number of features)
+    sum_vectors = np.zeros((vec_size,), dtype="float32")
     for vec in vectors:
-        sum_vectors = sum_vectors + vec
-    return sum_vectors/len(vectors)
+        sum_vectors = np.add(sum_vectors, vec)
+    sum_vectors = np.divide(sum_vectors, len(vectors))
+    return sum_vectors
 
 def infer_vector(entities, model, verbose = False):
     """Given a list of entities, returns the vector representing the document from which the entities 
@@ -51,14 +54,22 @@ def infer_vector(entities, model, verbose = False):
     """
     unknown_words = 0
     # get word vector of each entity; ignores word if the model does not know it
+    # TODO: use index2_word instead of try-catch
     entities_vecs = []
     for e in entities:
         try:
             # make sure to lower case each word!
-            entities_vecs.append(model[e.lower()])
+            docv = model[e.lower()]
+            entities_vecs.append(docv)
         except:
-            unknown_words += 1 # ignore unknown word
-    if unknown_words > 1 and verbose:
-        print("Number of unknown words: ", unknown_words, ", number of known words:", (len(entities)-unknown_words))
-    return mean_of_vectors(entities_vecs)
+            # try one more time, with upper-case word
+            try:
+                docv = model[e]
+                entities_vecs.append(docv)
+            except:
+                unknown_words += 1 # ignore unknown word
+    if verbose:
+        percentage = (len(entities)-unknown_words) * 100 / len(entities)
+        print("Known words: {}%  ({}/{})".format(percentage, (len(entities)-unknown_words), len(entities)))
+    return mean_of_vectors(entities_vecs, model.wv.vector_size)
     
