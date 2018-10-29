@@ -6,6 +6,7 @@ Module containing utils used for clustering.
 """
 
 from sklearn.cluster import DBSCAN
+#from sklearn.cluster import OPTICS
 
 # my function for performing dbscan and printing out cluster results
 def perform_dbscan(eps = 0.4, min_samples = 4, metric = 'euclidean', algorithm = 'auto', data = None, verbose = True
@@ -17,6 +18,10 @@ def perform_dbscan(eps = 0.4, min_samples = 4, metric = 'euclidean', algorithm =
     # labels will print out the number of the cluster each example belongs to;
     # -1 if the vector is considered noise (not belonging to any cluster)
     #print("Labels: ", db.labels_)
+
+    # check if all points were classified as noise (special case)
+    if len([label for label in db.labels_ if label==-1]) == len(data):
+        return db, {0: []}
 
     # create data structure containing clusters
     clusters_to_ret = {label:[] for label in db.labels_ if label!=-1}
@@ -67,7 +72,7 @@ def apply_dbscan(doc_vecs, titles, urls, subset_length, eps = 0.27, eps_incremen
     final_clusters = []
     # starting eps will be the sum of eps + eps_increment 
     for i in range(n_iterations):
-        if i==2: 
+        if i==(n_iterations-1): 
             noise_bool = True
         eps = eps + eps_increment
        
@@ -82,7 +87,7 @@ def apply_dbscan(doc_vecs, titles, urls, subset_length, eps = 0.27, eps_incremen
         subset = [subset[i] for i, label in enumerate(db.labels_) if label==-1]
         subset_titles = [subset_titles[i] for i, label in enumerate(db.labels_) if label==-1]
         sub_urls = [sub_urls[i] for i, label in enumerate(db.labels_) if label==-1]
-        if subset is None:
+        if len(subset)==0:
             break
     
     if verbose:
@@ -92,3 +97,49 @@ def apply_dbscan(doc_vecs, titles, urls, subset_length, eps = 0.27, eps_incremen
     # final clusters composition:
     #[[cluster0_urls], [cluster1_urls], ...]
     return final_clusters
+
+""" 
+def apply_optics(doc_vecs, urls, titles = '', subset_length = len(doc_vecs), n_iterations = 1, 
+                 verbose = False, min_samples = 2):
+    
+    # subset of docs vectors 
+    subset = doc_vecs[:subset_length]
+    subset_titles = titles[:subset_length]
+    sub_urls = urls[:subset_length]
+    
+    noise_bool = False
+    # this will contain all clusters found, each one as a list, 
+    # mantaining the order dbscan returned (first clusters will contain articles more related to each other)
+    final_clusters = []
+    # starting eps will be the sum of eps + eps_increment 
+    for i in range(n_iterations):
+        if i==(n_iterations-1): 
+            noise_bool = True
+       
+        opt = OPTICS(min_samples=min_samples, metric='cosine', algorithm='auto').fit(doc_vecs)
+        # create doc_urls clusters from OPTICS results
+        clusters = {label:[] for label in opt.labels_ if label!=-1}
+        
+        for i, label in enumerate(db.labels_):
+            if label != -1: #ignore noise points
+                clusters[label].append(urls[i])
+                
+        # TODO: ignore noise/'other' documents or return them?
+        for label, list_ in clusters.items():
+            final_clusters.append(list_)
+            
+        # let's try and find other clusters in the noise data, (possibily) with higher eps
+        subset = [subset[i] for i, label in enumerate(opt.labels_) if label==-1]
+        #subset_titles = [subset_titles[i] for i, label in enumerate(opt.labels_) if label==-1]
+        sub_urls = [sub_urls[i] for i, label in enumerate(opt.labels_) if label==-1]
+        if subset is []:
+            break
+    
+    if verbose:
+        print("Number of cluster found: ", len(final_clusters))
+        for i, cluster in enumerate(final_clusters):
+            print("Length of cluster {0}: {1}".format(i, len(cluster)))
+    # final clusters composition:
+    #[[cluster0_urls], [cluster1_urls], ...]
+    return final_clusters
+    """
