@@ -70,7 +70,7 @@ def compute_clustering_accuracy(clusters_res, clusters_exp, verbose = False):
         if corrects < 2:
             percentages_precision.append(0)
         else:
-            print("Corrects/Length cluster they're in", corrects, len(clusters_res[cindex]))
+            if verbose: print("Corrects/Length cluster they're in", corrects, len(clusters_res[cindex]))
             percentages_precision.append(corrects * 100 / len(clusters_res[cindex]))
     print("Accuracy (Precision) over each cluster: ", percentages_precision)
 

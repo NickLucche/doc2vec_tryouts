@@ -202,7 +202,7 @@ def delete_duplicates_from_list(list_):
     index_list = []
     for i, element in enumerate(list_):
         try:
-            index = list_.index(i+1, len(list_), element)
+            index = list_.index(element, i+1, len(list_)-1)
             index_list.append(index)
         except:
             None
