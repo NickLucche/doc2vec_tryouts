@@ -1,7 +1,7 @@
 
 
 
-def compute_clustering_accuracy(clusters_res, clusters_exp, verbose = False):
+def compute_clustering_accuracy(clusters_res, clusters_exp, verbose = False, alg = 'avg'):
     """ 
         No duplicates allowed.  No single-cluster elements allowed in the clusters_exp composition.
         
@@ -10,6 +10,9 @@ def compute_clustering_accuracy(clusters_res, clusters_exp, verbose = False):
         
         cluster_exp: list of expected clusters, given by the evaluation set; we're expecting 
         this list to have the same format as above (list of titles).
+        
+        alg: which algorithm to use when computing 'best' result for Precision and Recall; max 
+        keeps the best P,R for each cluster, min the worse(pessimistic), avg by default.
         
         The accuracy measure returned is known as 'recall' (true positives/sum of true pos. and false negatives)
         Given these two args, we return the accuracy percentage, calculated using the (soft) test rules:
@@ -34,7 +37,8 @@ def compute_clustering_accuracy(clusters_res, clusters_exp, verbose = False):
     """
    
 
-    results_occurences = []
+    p_results = []
+    r_results = []
     # go through each expected cluster  
     for doc_titles in clusters_exp:
         occurences = []
@@ -50,50 +54,43 @@ def compute_clustering_accuracy(clusters_res, clusters_exp, verbose = False):
                     if verbose: print(title[:10],'.. is in cluster!')
                     correct += 1
             # save how many docs we found in this cluster, and the cluster index
+            # this is the number of 'true positives' (correctly grouped)
             occurences.append((correct, index))
         # here we have all the occurences of docs computed in this iteration
-        # we store the best result:
-        # order list by most appearences and keep the last pair
-        occurences.sort(key = lambda tup: tup[0])
-        results_occurences.append(occurences[-1])
+        # we compute the Precision and Recall values, then store the best/worst/avg depending on arg
+        ps, rs = [], []
+        for (true_pos, c_index) in occurences:
+            if true_pos > 0: # you could ignore clusters with only 1 document classified too
+                ps.append(true_pos/len(clusters_res[c_index]) * 100) 
+                rs.append(true_pos/len(doc_titles) * 100)
+        if len(ps) > 0: # cluster was classified as noise otherwise
+            if alg=='max':
+                # keep the best P and the best R
+                p_results.append(max(ps))
+                r_results.append(max(rs))
+            elif alg=='min':
+                p_results.append(min(ps))
+                r_results.append(min(rs))
+            else:
+                p_results.append(sum(ps)/len(ps))
+                r_results.append(sum(rs)/len(rs))
+            
      # print the result list [ (most_occurences, cluster in which they occur the most)..]
-    print("Results occurences(correct guess, cluster index): ", results_occurences)
+    #print("Results occurences(correct guess, cluster index): ", results_occurences)
     
-    # compute percentages
-    correct = [c for (c, index) in results_occurences]
-    percentages_recall = []
-    percentages_precision = []
     
     ## PRECISION
-    for (corrects, cindex) in results_occurences:
-        # if less than 2 docs were correctly classified, the 'answer' is considered not correct
-        if corrects < 2:
-            percentages_precision.append(0)
-        else:
-            if verbose: print("Corrects/Length cluster they're in", corrects, len(clusters_res[cindex]))
-            percentages_precision.append(corrects * 100 / len(clusters_res[cindex]))
-    print("Accuracy (Precision) over each cluster: ", percentages_precision)
+    print("Accuracy (Precision) over each cluster: ", p_results)
 
     ## RECALL
-    for i, docs_titles in enumerate(clusters_exp):
-        # if less than 2 docs were correctly classified, the 'answer' is considered not correct
-        if correct[i] < 2:
-            percentages_recall.append(0)
-        else:
-            percentages_recall.append(correct[i] * 100 / len(docs_titles))
-    print("Accuracy (Recall) over each cluster: ", percentages_recall)
+    print("Accuracy (Recall) over each cluster: ", r_results)
     
     
     # compute the mean of percentages as final accuracy of the model over the test set (in terms of clustering)
-    p_sum = 0
-    for p in percentages_precision:
-        p_sum += p
-    precision_avg = p_sum/len(percentages_precision)
-    
-    p_sum = 0
-    for p in percentages_recall:
-        p_sum += p
-    recall_avg = p_sum/len(percentages_recall)
+
+    precision_avg = sum(p_results)/len(p_results)
+
+    recall_avg = sum(r_results)/len(r_results)
     
     
     # return PRECISION, RECALL
