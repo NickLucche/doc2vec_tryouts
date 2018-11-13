@@ -119,7 +119,7 @@ def choose_eps(min_count, docs_vecs, doc_titles):
         # get a row of the matrix (vector of distances for doc_j)
         
         # discard the distance between a doc and itself
-        doc_distances = np.delete(doc_distances, j)
+        # doc_distances = np.delete(doc_distances, j)
         for i in range(0, min_count-1):
             # get the closest doc to it and discard it, we only need the k-th closest doc.
             doc_distances = np.delete(doc_distances, np.argmin(doc_distances))
