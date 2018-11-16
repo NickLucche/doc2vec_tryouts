@@ -2,6 +2,8 @@ import gensim
 from gensim.models import Word2Vec
 import random
 import numpy as np
+import re
+import unicodedata
 
 def online_training(model, training_corpus, epochs = 5):
     """
@@ -28,6 +30,25 @@ def online_training(model, training_corpus, epochs = 5):
     return model
     # model.save()
     
+def strip_accents(text):
+    """
+    Strip accents from input String.
+
+    :param text: The input string.
+    :type text: String.
+
+    :returns: The processed String.
+    :rtype: String.
+    """
+    try:
+        text = unicode(text, 'utf-8')
+    except (TypeError, NameError): # unicode is a default on python 3 
+        pass
+    text = unicodedata.normalize('NFD', text)
+    text = text.encode('ascii', 'ignore')
+    text = text.decode("utf-8")
+    return str(text)
+    
 ## TODO: update with WEIGHTED MEAN OF VECTORS
 def mean_of_vectors(vectors, vec_size):
     """given a list of vectors (and their size), return the simplest mean of vectors."""
@@ -43,7 +64,7 @@ def mean_of_vectors(vectors, vec_size):
     sum_vectors = np.divide(sum_vectors, len(vectors))
     return sum_vectors
 
-def infer_vector(entities, model, verbose = False):
+def infer_vector(entities, model, index2word_set, verbose = False):
     """Given a list of entities, returns the vector representing the document from which the entities 
     were extracted from, wrt a given W2V model.
     
@@ -54,22 +75,37 @@ def infer_vector(entities, model, verbose = False):
     """
     unknown_words = 0
     # get word vector of each entity; ignores word if the model does not know it
-    # TODO: use index2_word instead of try-catch
     entities_vecs = []
+    unknown = []
+    
     for e in entities:
-        try:
-            # make sure to lower case each word!
-            docv = model[e.lower()]
-            entities_vecs.append(docv)
-        except:
-            # try one more time, with upper-case word
-            try:
-                docv = model[e]
-                entities_vecs.append(docv)
-            except:
-                unknown_words += 1 # ignore unknown word
+        e = strip_accents(e)  # strip the accents from the word
+        
+        if e in index2word_set: 
+            entities_vecs.append(model[e])
+        elif e.lower() in index2word_set:
+            entities_vecs.append(model[e.lower()])
+        else:
+            # unknown word, try to split the word (maybe be formed by multiple words)
+            # and use the sum of single-word vectors as the vector of the entity
+            words = e.split()
+            word_v = np.zeros((model.wv.vector_size, ), dtype="float32")
+            u = 0
+            for word in words:
+                if word in index2word_set:
+                    word_v = np.add(word_v, model[word])
+                elif word.lower() in index2word_set:
+                    word_v = np.add(word_v, model[word.lower()])
+                else: # keep trying, get an approximation for it at least
+                    u += 1
+            if u==len(words):
+                unknown.append(e)
+                unknown_words += 1
+            else: # at least one sub-word was recognized
+                entities_vecs.append( np.divide(word_v, len(word_v)) )
     if verbose:
         percentage = (len(entities)-unknown_words) * 100 / len(entities)
         print("Known words: {}%  ({}/{})".format(percentage, (len(entities)-unknown_words), len(entities)))
+        if len(unknown) > 0: print("Unknown entities found: ", unknown)
     return mean_of_vectors(entities_vecs, model.wv.vector_size)
     
